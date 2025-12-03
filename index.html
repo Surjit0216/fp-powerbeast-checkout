@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Secure checkout for FP PowerBeast Indicator - Premium TradingView indicator with 100% non-repaint signals">
+    <title>Checkout - FP PowerBeast Indicator</title>
+    
+    <!-- Razorpay SDK -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --navy-dark: #0a1628;
+            --navy-mid: #132a4a;
+            --navy-light: #1e3a5f;
+            --teal-bright: #00e5cc;
+            --teal-electric: #00fff5;
+            --silver: #c0c8d4;
+            --silver-light: #e8ecf1;
+            --white: #ffffff;
+            --success: #00ff88;
+            --danger: #ff3366;
+            --warning: #ffaa00;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-mid) 50%, var(--navy-light) 100%);
+            color: var(--white);
+            line-height: 1.6;
+            overflow-x: hidden;
+            position: relative;
+            min-height: 100vh;
+        }
+
+        /* Animated Trading Background */
+        .trading-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.08;
+            pointer-events: none;
+        }
+
+        .candlestick {
+            position: absolute;
+            width: 2px;
+            background: var(--teal-bright);
+            animation: candleGrow 3s ease-in-out infinite;
+        }
+
+        .candlestick::before,
+        .candlestick::after {
+            content: '';
+            position: absolute;
+            width: 8px;
+            height: 20px;
+            left: -3px;
+            background: var(--teal-bright);
+        }
+
+        .candlestick::before { top: 0; }
+        .candlestick::after { bottom: 0; }
+
+        .candlestick.bearish {
+            background: var(--danger);
+        }
+
+        .candlestick.bearish::before,
+        .candlestick.bearish::after {
+            background: var(--danger);
+        }
+
+        @keyframes candleGrow {
+            0%, 100% { transform: scaleY(1); opacity: 0.6; }
+            50% { transform: scaleY(1.2); opacity: 0.8; }
+        }
+
+        .support-line,
+        .resistance-line {
+            position: absolute;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent 0%, var(--teal-bright) 50%, transparent 100%);
+            animation: lineMove 8s linear infinite;
+        }
+
+        .resistance-line {
+            background: linear-gradient(90deg, transparent 0%, var(--danger) 50%, transparent 100%);
+            animation: lineMove 10s linear infinite reverse;
+        }
+
+        @keyframes lineMove {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        /* Main Container */
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 3rem 0;
+            border-bottom: 1px solid rgba(0, 229, 204, 0.2);
+            margin-bottom: 3rem;
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--teal-electric) 0%, var(--teal-bright) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .tagline {
+            color: var(--silver);
+            font-size: 1.1rem;
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .hero h1 {
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 800;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--white) 0%, var(--silver-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 1.3rem;
+            color: var(--silver);
+            max-width: 700px;
+            margin: 0 auto 2rem;
+        }
+
+        /* Price Cards */
+        .price-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .price-card {
+            background: linear-gradient(135deg, rgba(19, 42, 74, 0.8) 0%, rgba(30, 58, 95, 0.6) 100%);
+            border: 2px solid rgba(0, 229, 204, 0.3);
+            border-radius: 20px;
+            padding: 3rem 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .price-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--teal-bright) 0%, var(--teal-electric) 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .price-card:hover {
+            transform: translateY(-10px);
+            border-color: var(--teal-bright);
+            box-shadow: 0 20px 60px rgba(0, 229, 204, 0.3);
+        }
+
+        .price-card:hover::before {
+            opacity: 0.05;
+        }
+
+        .price-card.featured {
+            border-color: var(--teal-bright);
+            box-shadow: 0 10px 40px rgba(0, 229, 204, 0.2);
+            transform: scale(1.05);
+        }
+
+        .price-card.featured::after {
+            content: 'BEST VALUE';
+            position: absolute;
+            top: 20px;
+            right: -30px;
+            background: linear-gradient(135deg, var(--teal-bright) 0%, var(--teal-electric) 100%);
+            color: var(--navy-dark);
+            padding: 0.5rem 3rem;
+            font-weight: 700;
+            font-size: 0.75rem;
+            transform: rotate(45deg);
+            letter-spacing: 1px;
+        }
+
+        .price-card-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .plan-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--teal-bright);
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .price {
+            font-size: 3.5rem;
+            font-weight: 800;
+            color: var(--white);
+            margin-bottom: 0.5rem;
+        }
+
+        .price-period {
+            font-size: 1rem;
+            color: var(--silver);
+            margin-bottom: 2rem;
+        }
+
+        .features-list {
+            list-style: none;
+            margin-bottom: 2rem;
+            text-align: left;
+        }
+
+        .features-list li {
+            padding: 0.75rem 0;
+            color: var(--silver-light);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .features-list li::before {
+            content: '✓';
+            color: var(--success);
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        /* Buttons */
+        .btn {
+            width: 100%;
+            padding: 1.2rem 2rem;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--teal-bright) 0%, var(--teal-electric) 100%);
+            color: var(--navy-dark);
+            box-shadow: 0 10px 30px rgba(0, 229, 204, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(0, 229, 204, 0.6);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--white);
+            border: 2px solid var(--teal-bright);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(0, 229, 204, 0.1);
+            transform: translateY(-3px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .payment-note {
+            margin-top: 1rem;
+            font-size: 0.85rem;
+            color: var(--silver);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .payment-note::before {
+            content: '🔒';
+        }
+
+        /* Trust Badges */
+        .trust-badges {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+            margin: 3rem 0;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 15px;
+            border: 1px solid rgba(0, 229, 204, 0.1);
+        }
+
+        .badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--silver);
+            font-size: 0.9rem;
+        }
+
+        .badge-icon {
+            font-size: 1.5rem;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 22, 40, 0.95);
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, var(--navy-mid) 0%, var(--navy-light) 100%);
+            border: 2px solid var(--teal-bright);
+            border-radius: 20px;
+            padding: 3rem;
+            max-width: 500px;
+            width: 100%;
+            position: relative;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            color: var(--silver);
+            font-size: 2rem;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .modal-close:hover {
+            color: var(--white);
+        }
+
+        .modal h2 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: var(--teal-bright);
+        }
+
+        .modal p {
+            color: var(--silver);
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--silver-light);
+            font-weight: 600;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid rgba(0, 229, 204, 0.3);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--white);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--teal-bright);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Success/Error Messages */
+        .message {
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-bottom: 2rem;
+            display: none;
+        }
+
+        .message.active {
+            display: block;
+        }
+
+        .message.success {
+            background: rgba(0, 255, 136, 0.1);
+            border: 2px solid var(--success);
+            color: var(--success);
+        }
+
+        .message.error {
+            background: rgba(255, 51, 102, 0.1);
+            border: 2px solid var(--danger);
+            color: var(--danger);
+        }
+
+        .message h3 {
+            margin-bottom: 0.5rem;
+            font-size: 1.3rem;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            display: none;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(0, 229, 204, 0.2);
+            border-top-color: var(--teal-bright);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 2rem auto;
+        }
+
+        .spinner.active {
+            display: block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Promo Code */
+        .promo-section {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(0, 229, 204, 0.2);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 3rem 0;
+            text-align: center;
+        }
+
+        .promo-input-group {
+            display: flex;
+            gap: 1rem;
+            max-width: 500px;
+            margin: 1rem auto 0;
+        }
+
+        .promo-input-group input {
+            flex: 1;
+            padding: 1rem;
+            border: 2px solid rgba(0, 229, 204, 0.3);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--white);
+            font-size: 1rem;
+        }
+
+        .promo-input-group button {
+            padding: 1rem 2rem;
+            background: linear-gradient(135deg, var(--teal-bright) 0%, var(--teal-electric) 100%);
+            color: var(--navy-dark);
+            border: none;
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .promo-input-group button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 229, 204, 0.4);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 3rem 2rem;
+            border-top: 1px solid rgba(0, 229, 204, 0.2);
+            margin-top: 4rem;
+            color: var(--silver);
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .footer-links a {
+            color: var(--silver);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--teal-bright);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .price-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .price-card.featured {
+                transform: scale(1);
+            }
+
+            .trust-badges {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .modal-content {
+                padding: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated Trading Background -->
+    <div class="trading-background">
+        <div class="candlestick" style="left: 10%; height: 80px; top: 20%; animation-delay: 0s;"></div>
+        <div class="candlestick bearish" style="left: 25%; height: 100px; top: 40%; animation-delay: 0.5s;"></div>
+        <div class="candlestick" style="left: 40%; height: 60px; top: 60%; animation-delay: 1s;"></div>
+        <div class="candlestick bearish" style="left: 55%; height: 90px; top: 30%; animation-delay: 1.5s;"></div>
+        <div class="candlestick" style="left: 70%; height: 70px; top: 50%; animation-delay: 2s;"></div>
+        <div class="candlestick bearish" style="left: 85%; height: 85px; top: 25%; animation-delay: 2.5s;"></div>
+        
+        <div class="support-line" style="top: 30%;"></div>
+        <div class="resistance-line" style="top: 60%;"></div>
+        <div class="support-line" style="top: 80%; animation-delay: 2s;"></div>
+    </div>
+
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">FP PowerBeast</div>
+            <p class="tagline">100% Non-Repaint Trading Indicator</p>
+        </header>
+
+        <!-- Hero -->
+        <section class="hero">
+            <h1>Choose Your Plan</h1>
+            <p>Start trading with confidence. Select the plan that works best for you.</p>
+        </section>
+
+        <!-- Messages -->
+        <div id="successMessage" class="message success">
+            <h3>🎉 Payment Successful!</h3>
+            <p>Welcome to FP PowerBeast! Check your inbox at <strong id="userEmail"></strong> for access instructions.</p>
+            <button class="btn btn-primary" onclick="window.location.href='https://surjit0216.github.io/fp-powerbeast-landing/'">Get Started</button>
+        </div>
+
+        <div id="errorMessage" class="message error">
+            <h3>❌ Payment Failed</h3>
+            <p id="errorText">Something went wrong. Please try another payment method or contact us at maansingh0216@gmail.com</p>
+            <button class="btn btn-secondary" onclick="closeError()">Try Again</button>
+        </div>
+
+        <!-- Price Cards -->
+        <div class="price-cards">
+            <!-- Free Trial -->
+            <div class="price-card">
+                <div class="price-card-content">
+                    <h3 class="plan-name">Free Trial</h3>
+                    <div class="price">₹0</div>
+                    <p class="price-period">7 days free access</p>
+                    
+                    <ul class="features-list">
+                        <li>Full indicator access</li>
+                        <li>All features unlocked</li>
+                        <li>Multi-target system</li>
+                        <li>Dynamic targets</li>
+                        <li>Email support</li>
+                        <li>7-day trial period</li>
+                    </ul>
+                    
+                    <button class="btn btn-secondary" onclick="openTrialModal()">
+                        Start Free Trial — 7 days
+                    </button>
+                    
+                    <p class="payment-note">No credit card required</p>
+                </div>
+            </div>
+
+            <!-- Lifetime -->
+            <div class="price-card featured">
+                <div class="price-card-content">
+                    <h3 class="plan-name">Lifetime Access</h3>
+                    <div class="price">₹5,000</div>
+                    <p class="price-period">One-time payment</p>
+                    
+                    <ul class="features-list">
+                        <li>Lifetime indicator access</li>
+                        <li>All features forever</li>
+                        <li>Free updates included</li>
+                        <li>Priority support</li>
+                        <li>WhatsApp community</li>
+                        <li>One-time payment</li>
+                        <li>Best value guarantee</li>
+                    </ul>
+                    
+                    <button class="btn btn-primary" onclick="initiatePayment('lifetime', 5000, 'Lifetime Access')">
+                        Buy Lifetime — One-time ₹5,000
+                    </button>
+                    
+                    <p class="payment-note">Secure payments via Razorpay. UPI | Card | Netbanking accepted.</p>
+                </div>
+            </div>
+
+            <!-- Monthly -->
+            <div class="price-card">
+                <div class="price-card-content">
+                    <h3 class="plan-name">Monthly Plan</h3>
+                    <div class="price">₹2,000</div>
+                    <p class="price-period">per month</p>
+                    
+                    <ul class="features-list">
+                        <li>Full indicator access</li>
+                        <li>All features unlocked</li>
+                        <li>Multi-target system</li>
+                        <li>Dynamic targets</li>
+                        <li>Email & chat support</li>
+                        <li>Cancel anytime</li>
+                    </ul>
+                    
+                    <button class="btn btn-secondary" onclick="initiatePayment('monthly', 2000, 'Monthly Plan')">
+                        Buy Monthly — ₹2,000/month — Cancel anytime
+                    </button>
+                    
+                    <p class="payment-note">Secure payments via Razorpay. UPI | Card | Netbanking accepted.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Promo Code Section -->
+        <div class="promo-section">
+            <h3 style="color: var(--teal-bright); margin-bottom: 0.5rem;">Have a Promo Code?</h3>
+            <p style="color: var(--silver); margin-bottom: 1rem;">Enter your code to get special discounts</p>
+            <div class="promo-input-group">
+                <input type="text" id="promoCode" placeholder="Enter promo code" />
+                <button onclick="applyPromo()">Apply</button>
+            </div>
+            <p id="promoMessage" style="margin-top: 1rem; color: var(--success); display: none;"></p>
+        </div>
+
+        <!-- Trust Badges -->
+        <div class="trust-badges">
+            <div class="badge">
+                <span class="badge-icon">🔒</span>
+                <span>256-bit SSL Encryption</span>
+            </div>
+            <div class="badge">
+                <span class="badge-icon">✓</span>
+                <span>PCI DSS Compliant</span>
+            </div>
+            <div class="badge">
+                <span class="badge-icon">💳</span>
+                <span>UPI | Cards | Netbanking</span>
+            </div>
+            <div class="badge">
+                <span class="badge-icon">🛡️</span>
+                <span>100% Secure Payments</span>
+            </div>
+            <div class="badge">
+                <span class="badge-icon">↩️</span>
+                <span>7-Day Money Back</span>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-links">
+                <a href="https://surjit0216.github.io/fp-powerbeast-landing/">Home</a>
+                <a href="#privacy">Privacy Policy</a>
+                <a href="#terms">Terms of Service</a>
+                <a href="#refund">Refund Policy</a>
+                <a href="mailto:maansingh0216@gmail.com">Contact</a>
+            </div>
+            <p style="margin-top: 1rem;">
+                <strong style="color: var(--teal-bright);">Powered by FP PowerBeast Engine</strong><br>
+                © 2025 FP PowerBeast Indicator. All rights reserved.<br>
+                <small>Trading involves risk. Past performance does not guarantee future results.</small>
+            </p>
+        </footer>
+    </div>
+
+    <!-- Trial Modal -->
+    <div id="trialModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeTrialModal()">&times;</button>
+            <h2>Start Your Free Trial</h2>
+            <p>Get 7 days of full access to FP PowerBeast Indicator. No credit card required.</p>
+            
+            <form onsubmit="submitTrial(event)">
+                <div class="form-group">
+                    <label for="trialName">Full Name</label>
+                    <input type="text" id="trialName" required placeholder="Enter your name" />
+                </div>
+                
+                <div class="form-group">
+                    <label for="trialEmail">Email Address</label>
+                    <input type="email" id="trialEmail" required placeholder="your@email.com" />
+                </div>
+                
+                <div class="form-group">
+                    <label for="trialPhone">WhatsApp Number</label>
+                    <input type="tel" id="trialPhone" required placeholder="+91 XXXXX XXXXX" />
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Start Free Trial</button>
+            </form>
+            
+            <div class="spinner" id="trialSpinner"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const RAZORPAY_KEY = 'rzp_test_YOUR_KEY_HERE'; // Replace with your Razorpay key
+        const API_BASE_URL = 'https://your-backend-api.com/api'; // Replace with your backend URL
+        
+        let appliedPromo = null;
+
+        // Open/Close Trial Modal
+        function openTrialModal() {
+            document.getElementById('trialModal').classList.add('active');
+        }
+
+        function closeTrialModal() {
+            document.getElementById('trialModal').classList.remove('active');
+        }
+
+        // Submit Trial Form
+        async function submitTrial(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('trialName').value;
+            const email = document.getElementById('trialEmail').value;
+            const phone = document.getElementById('trialPhone').value;
+            
+            const spinner = document.getElementById('trialSpinner');
+            spinner.classList.add('active');
+            
+            try {
+                // In production, send to your backend
+                const response = await fetch(`${API_BASE_URL}/trial`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, phone })
+                });
+                
+                if (response.ok) {
+                    closeTrialModal();
+                    showSuccess(email);
+                    
+                    // Send WhatsApp message
+                    const message = `Hi! I've started my 7-day free trial. Name: ${name}, Email: ${email}`;
+                    window.open(`https://wa.me/918850573341?text=${encodeURIComponent(message)}`, '_blank');
+                } else {
+                    throw new Error('Trial signup failed');
+                }
+            } catch (error) {
+                console.error('Trial error:', error);
+                showError('Failed to start trial. Please contact support.');
+            } finally {
+                spinner.classList.remove('active');
+            }
+        }
+
+        // Apply Promo Code
+        function applyPromo() {
+            const promoCode = document.getElementById('promoCode').value.toUpperCase();
+            const promoMessage = document.getElementById('promoMessage');
+            
+            // Example promo codes
+            const promoCodes = {
+                'LAUNCH50': { discount: 50, type: 'percentage' },
+                'SAVE1000': { discount: 1000, type: 'fixed' },
+                'FIRST100': { discount: 100, type: 'fixed' }
+            };
+            
+            if (promoCodes[promoCode]) {
+                appliedPromo = promoCodes[promoCode];
+                promoMessage.textContent = `✓ Promo code applied! You'll save ${appliedPromo.type === 'percentage' ? appliedPromo.discount + '%' : '₹' + appliedPromo.discount}`;
+                promoMessage.style.display = 'block';
+                promoMessage.style.color = 'var(--success)';
+            } else {
+                promoMessage.textContent = '✗ Invalid promo code';
+                promoMessage.style.display = 'block';
+                promoMessage.style.color = 'var(--danger)';
+                appliedPromo = null;
+            }
+        }
+
+        // Calculate Final Amount
+        function calculateFinalAmount(baseAmount) {
+            if (!appliedPromo) return baseAmount;
+            
+            if (appliedPromo.type === 'percentage') {
+                return baseAmount - (baseAmount * appliedPromo.discount / 100);
+            } else {
+                return Math.max(0, baseAmount - appliedPromo.discount);
+            }
+        }
+
+        // Initiate Payment
+        async function initiatePayment(planType, amount, planName) {
+            try {
+                const finalAmount = calculateFinalAmount(amount);
+                const gst = Math.round(finalAmount * 0.18); // 18% GST
+                const totalAmount = finalAmount + gst;
+                
+                // Create order on backend
+                const orderResponse = await fetch(`${API_BASE_URL}/create-order`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        planType,
+                        amount: totalAmount * 100, // Convert to paise
+                        currency: 'INR',
+                        promoCode: appliedPromo ? document.getElementById('promoCode').value : null
+                    })
+                });
+                
+                if (!orderResponse.ok) {
+                    throw new Error('Failed to create order');
+                }
+                
+                const orderData = await orderResponse.json();
+                
+                // Initialize Razorpay
+                const options = {
+                    key: RAZORPAY_KEY,
+                    amount: totalAmount * 100,
+                    currency: 'INR',
+                    name: 'FP PowerBeast',
+                    description: planName,
+                    order_id: orderData.orderId,
+                    handler: function(response) {
+                        verifyPayment(response, planType);
+                    },
+                    prefill: {
+                        name: '',
+                        email: '',
+                        contact: ''
+                    },
+                    notes: {
+                        plan: planType,
+                        promo: appliedPromo ? document.getElementById('promoCode').value : 'none'
+                    },
+                    theme: {
+                        color: '#00e5cc'
+                    },
+                    modal: {
+                        ondismiss: function() {
+                            console.log('Payment cancelled');
+                        }
+                    }
+                };
+                
+                const razorpay = new Razorpay(options);
+                razorpay.open();
+                
+            } catch (error) {
+                console.error('Payment initiation error:', error);
+                showError('Failed to initiate payment. Please try again or contact support.');
+            }
+        }
+
+        // Verify Payment
+        async function verifyPayment(response, planType) {
+            try {
+                const verifyResponse = await fetch(`${API_BASE_URL}/verify-payment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        razorpay_order_id: response.razorpay_order_id,
+                        razorpay_payment_id: response.razorpay_payment_id,
+                        razorpay_signature: response.razorpay_signature,
+                        planType
+                    })
+                });
+                
+                if (verifyResponse.ok) {
+                    const data = await verifyResponse.json();
+                    showSuccess(data.email || 'your email');
+                } else {
+                    throw new Error('Payment verification failed');
+                }
+            } catch (error) {
+                console.error('Verification error:', error);
+                showError('Payment received but verification failed. Our team will contact you shortly.');
+            }
+        }
+
+        // Show Success Message
+        function showSuccess(email) {
+            document.getElementById('userEmail').textContent = email;
+            document.getElementById('successMessage').classList.add('active');
+            document.getElementById('errorMessage').classList.remove('active');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Show Error Message
+        function showError(message) {
+            document.getElementById('errorText').textContent = message;
+            document.getElementById('errorMessage').classList.add('active');
+            document.getElementById('successMessage').classList.remove('active');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Close Error
+        function closeError() {
+            document.getElementById('errorMessage').classList.remove('active');
+        }
+
+        // Demo mode - Remove in production
+        console.log('%c⚠️ DEMO MODE', 'color: #ff3366; font-size: 20px; font-weight: bold;');
+        console.log('Replace RAZORPAY_KEY and API_BASE_URL with your actual values');
+        console.log('Implement backend endpoints: /api/create-order, /api/verify-payment, /api/trial');
+    </script>
+</body>
+</html>
